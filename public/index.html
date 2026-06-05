@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>积分小账本</title>
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%236c5ce7' width='100' height='100' rx='20'/><text x='50' y='68' font-size='50' text-anchor='middle' fill='white'>✦</text></svg>">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d28;
+    --card-hover: #222636;
+    --accent: #6c5ce7;
+    --accent-light: #a29bfe;
+    --green: #00b894;
+    --green-light: #55efc4;
+    --orange: #fdcb6e;
+    --red: #e17055;
+    --text: #f0f0f5;
+    --text-dim: #8a8a9a;
+    --border: #2d3040;
+    --radius: 16px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding-bottom: 100px;
+    overscroll-behavior: none;
+  }
+
+  .header { padding: 20px 20px 0; text-align: center; }
+  .header h1 { font-size: 20px; font-weight: 600; color: var(--text-dim); letter-spacing: 2px; }
+
+  .points-card {
+    margin: 20px 16px; padding: 28px 24px 24px;
+    background: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%);
+    border-radius: 20px; position: relative; overflow: hidden;
+  }
+  .points-card::after {
+    content: ''; position: absolute; top: -30px; right: -30px;
+    width: 120px; height: 120px; background: rgba(255,255,255,0.08); border-radius: 50%;
+  }
+  .points-card .label { font-size: 13px; color: rgba(255,255,255,0.7); margin-bottom: 4px; }
+  .points-card .amount { font-size: 48px; font-weight: 800; color: #fff; line-height: 1.1; }
+  .points-card .amount span { font-size: 20px; font-weight: 600; margin-right: 4px; }
+  .points-card .rmb { margin-top: 8px; font-size: 14px; color: rgba(255,255,255,0.8); }
+  .points-card .rmb b { font-size: 18px; color: #fff; }
+
+  .goal-bar { margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.15); }
+  .goal-bar .goal-info { display: flex; justify-content: space-between; font-size: 12px; color: rgba(255,255,255,0.7); margin-bottom: 8px; }
+  .goal-bar .progress-track { height: 6px; background: rgba(255,255,255,0.2); border-radius: 3px; overflow: hidden; }
+  .goal-bar .progress-fill { height: 100%; background: #55efc4; border-radius: 3px; transition: width 0.5s ease; }
+
+  .section-title { padding: 0 20px; margin: 24px 0 12px; font-size: 15px; font-weight: 600; color: var(--text-dim); }
+
+  .checkin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 16px; }
+  .checkin-item {
+    background: var(--card); border-radius: var(--radius); padding: 16px 12px;
+    text-align: center; cursor: pointer; transition: all 0.2s;
+    border: 2px solid transparent; user-select: none;
+  }
+  .checkin-item:active { transform: scale(0.96); }
+  .checkin-item.checked { border-color: var(--green); background: rgba(0,184,148,0.08); }
+  .checkin-item .icon { font-size: 28px; margin-bottom: 6px; }
+  .checkin-item .name { font-size: 13px; color: var(--text); margin-bottom: 4px; }
+  .checkin-item .pts { font-size: 12px; color: var(--accent-light); }
+  .checkin-item.checked .pts { color: var(--green-light); }
+  .checkin-item .undo-hint { font-size: 10px; color: var(--orange); margin-top: 4px; opacity: 0; transition: opacity 0.2s; }
+  .checkin-item.checked .undo-hint { opacity: 1; }
+
+  .custom-task { margin: 12px 16px; position: relative; display: flex; align-items: center; }
+  .custom-task input {
+    width: 100%; background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px 80px 12px 16px; color: var(--text); font-size: 14px; outline: none;
+  }
+  .custom-task input::placeholder { color: var(--text-dim); }
+  .custom-task input:focus { border-color: var(--accent); }
+  .custom-task button {
+    position: absolute; right: 6px; background: var(--accent); color: #fff;
+    border: none; border-radius: 10px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+  .custom-task button:active { opacity: 0.8; }
+
+  .task-list { padding: 0 16px; }
+  .task-item {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--card); border-radius: 12px; padding: 14px 16px; margin-bottom: 8px;
+  }
+  .task-item .left { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+  .task-item .check-circle {
+    width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border);
+    display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px; transition: all 0.2s; flex-shrink: 0;
+  }
+  .task-item .task-name { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .task-item .task-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .task-item .task-pts { font-size: 12px; color: var(--accent-light); }
+  .task-item .btn-del-task {
+    width: 22px; height: 22px; border-radius: 50%; background: transparent;
+    border: none; color: var(--text-dim); font-size: 14px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .task-item .btn-del-task:active { color: var(--red); }
+
+  .bottom-nav {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--card); border-top: 1px solid var(--border);
+    display: flex; padding: 8px 0 env(safe-area-inset-bottom, 8px); z-index: 100;
+  }
+  .nav-item { flex: 1; text-align: center; padding: 8px 0; cursor: pointer; color: var(--text-dim); font-size: 11px; transition: color 0.2s; }
+  .nav-item.active { color: var(--accent-light); }
+  .nav-item .nav-icon { font-size: 22px; margin-bottom: 2px; }
+
+  .page { display: none; }
+  .page.active { display: block; }
+
+  .history-day { margin: 0 16px 12px; background: var(--card); border-radius: var(--radius); padding: 16px; }
+  .history-day .day-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .history-day .day-date { font-size: 15px; font-weight: 600; }
+  .history-day .day-points { font-size: 14px; color: var(--green); font-weight: 600; }
+  .history-day .day-items { font-size: 13px; color: var(--text-dim); line-height: 1.8; }
+  .history-day .day-items .item-pts { color: var(--green-light); margin-left: 4px; }
+
+  .setting-section { margin: 0 16px 20px; background: var(--card); border-radius: var(--radius); padding: 16px; }
+  .setting-section .stitle { font-size: 13px; color: var(--text-dim); margin-bottom: 12px; }
+  .setting-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .setting-row:last-child { border-bottom: none; }
+  .setting-row label { font-size: 14px; }
+  .setting-row input { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text); font-size: 14px; width: 140px; text-align: right; outline: none; }
+  .setting-row input:focus { border-color: var(--accent); }
+  .btn-save { margin-top: 12px; width: 100%; background: var(--accent); color: #fff; border: none; border-radius: 12px; padding: 14px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .btn-save:active { opacity: 0.8; }
+  .btn-danger { margin-top: 8px; width: 100%; background: transparent; color: var(--red); border: 1px solid var(--red); border-radius: 12px; padding: 14px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .btn-small-danger {
+    background: transparent; color: var(--red); border: 1px solid rgba(225,112,85,0.3);
+    border-radius: 8px; padding: 4px 10px; font-size: 12px; cursor: pointer; white-space: nowrap;
+  }
+  .btn-small-danger:active { border-color: var(--red); }
+
+  .redeem-card { margin: 0 16px 12px; background: var(--card); border-radius: var(--radius); padding: 16px; display: flex; align-items: center; justify-content: space-between; }
+  .redeem-card .redeem-info .redeem-name { font-size: 15px; font-weight: 600; }
+  .redeem-card .redeem-info .redeem-cost { font-size: 13px; color: var(--text-dim); margin-top: 4px; }
+  .redeem-card .btn-redeem { background: var(--green); color: #fff; border: none; border-radius: 10px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .redeem-card .btn-redeem:disabled { background: var(--border); color: var(--text-dim); cursor: not-allowed; }
+
+  .add-redeem { margin: 12px 16px; display: flex; gap: 8px; }
+  .add-redeem input { flex: 1; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; color: var(--text); font-size: 14px; outline: none; }
+  .add-redeem input:focus { border-color: var(--accent); }
+  .add-redeem input::placeholder { color: var(--text-dim); }
+  .add-redeem button { background: var(--accent); color: #fff; border: none; border-radius: 12px; padding: 12px 16px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--text-dim); font-size: 14px; }
+
+  .toast { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.8); background: rgba(0,0,0,0.85); color: #fff; padding: 12px 24px; border-radius: 12px; font-size: 14px; z-index: 999; opacity: 0; transition: all 0.3s; pointer-events: none; }
+  .toast.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+  .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 200; display: none; align-items: center; justify-content: center; }
+  .modal-overlay.show { display: flex; }
+  .modal-box { background: var(--card); border-radius: 20px; padding: 28px 24px; width: 85%; max-width: 320px; text-align: center; }
+  .modal-box .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 10px; }
+  .modal-box .modal-desc { font-size: 14px; color: var(--text-dim); margin-bottom: 24px; line-height: 1.6; }
+  .modal-box .modal-btns { display: flex; gap: 12px; }
+  .modal-box .modal-btns button { flex: 1; padding: 12px; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; border: none; }
+  .modal-box .btn-cancel { background: var(--border); color: var(--text); }
+  .modal-box .btn-confirm { background: var(--green); color: #fff; }
+
+  .stat-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 16px; margin-bottom: 20px; }
+  .stat-item { background: var(--card); border-radius: var(--radius); padding: 16px; text-align: center; }
+  .stat-item .stat-num { font-size: 24px; font-weight: 800; color: var(--green); }
+  .stat-item .stat-label { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+
+  /* 新增打卡项表单 */
+  .add-checkin-form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+  .add-checkin-form input {
+    flex: 1; min-width: 80px; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 10px; color: var(--text); font-size: 13px; outline: none;
+  }
+  .add-checkin-form input:focus { border-color: var(--accent); }
+  .add-checkin-form input::placeholder { color: var(--text-dim); }
+  .add-checkin-form .icon-input { width: 50px; flex: none; text-align: center; }
+  .add-checkin-form .pts-input { width: 55px; flex: none; text-align: center; }
+  .add-checkin-form button {
+    background: var(--accent); color: #fff; border: none; border-radius: 8px;
+    padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+
+  .checkin-manage-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .checkin-manage-item:last-child { border-bottom: none; }
+  .checkin-manage-item .cm-left { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+  .checkin-manage-item .cm-icon { font-size: 18px; }
+  .checkin-manage-item .cm-pts { font-size: 12px; color: var(--accent-light); }
+</style>
+</head>
+<body>
+
+<div class="header"><h1>✦ 积分小账本 ✦</h1></div>
+
+<div class="points-card" id="pointsCard">
+  <div class="label">当前积分</div>
+  <div class="amount"><span>+</span><span id="totalPoints">0</span></div>
+  <div class="rmb">≈ ¥ <b id="totalRMB">0</b></div>
+  <div class="goal-bar" id="goalBar">
+    <div class="goal-info">
+      <span id="goalLabel">设置心愿目标</span>
+      <span id="goalPercent">0%</span>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="goalFill" style="width:0%"></div></div>
+  </div>
+</div>
+
+<div class="page active" id="pageHome">
+  <div class="section-title">自定义任务</div>
+  <div class="custom-task">
+    <input type="text" id="customTaskInput" placeholder="输入任务名称，回车添加" maxlength="20" enterkeyhint="done">
+    <button onclick="addCustomTask()">+2分</button>
+  </div>
+  <div class="task-list" id="customTaskList"></div>
+  <div class="section-title">今日打卡</div>
+  <div class="checkin-grid" id="checkinGrid"></div>
+</div>
+
+<div class="page" id="pageHistory">
+  <div class="section-title">统计概览</div>
+  <div class="stat-row">
+    <div class="stat-item"><div class="stat-num" id="statTotal">0</div><div class="stat-label">累计积分</div></div>
+    <div class="stat-item"><div class="stat-num" id="statDays">0</div><div class="stat-label">打卡天数</div></div>
+  </div>
+  <div class="stat-row">
+    <div class="stat-item"><div class="stat-num" id="statSleepRate">0%</div><div class="stat-label">早睡达标率</div></div>
+    <div class="stat-item"><div class="stat-num" id="statWakeRate">0%</div><div class="stat-label">早起达标率</div></div>
+  </div>
+  <div class="section-title">历史记录</div>
+  <div id="historyList"></div>
+</div>
+
+<div class="page" id="pageRedeem">
+  <div class="section-title">心愿清单</div>
+  <div id="redeemList"></div>
+  <div class="section-title">添加心愿</div>
+  <div class="add-redeem">
+    <input type="text" id="redeemName" placeholder="想要的东西...">
+    <input type="number" id="redeemCost" placeholder="积分" style="width:80px;flex:none;">
+    <button onclick="addRedeem()">添加</button>
+  </div>
+</div>
+
+<div class="page" id="pageSettings">
+  <div class="section-title">打卡项目管理</div>
+  <div class="setting-section">
+    <div id="checkinManageList"></div>
+    <div class="add-checkin-form">
+      <input type="text" id="newCheckinIcon" class="icon-input" placeholder="🌙" maxlength="2">
+      <input type="text" id="newCheckinName" placeholder="任务名称" maxlength="10">
+      <input type="number" id="newCheckinPts" class="pts-input" placeholder="积分" value="3">
+      <button onclick="addCheckinItem()">添加</button>
+    </div>
+  </div>
+
+  <div class="section-title">积分规则</div>
+  <div class="setting-section">
+    <div class="setting-row"><label>📋 自定义任务</label><input type="number" id="cfgTask" value="2"> 分</div>
+    <div class="setting-row"><label>💱 兑换比例</label><input type="text" id="cfgRate" value="1" style="width:60px"> 积分=1元</div>
+  </div>
+
+  <div class="section-title">心愿目标</div>
+  <div class="setting-section">
+    <div class="setting-row"><label>🎯 目标物品</label><input type="text" id="cfgGoalName" placeholder="想买什么？"></div>
+    <div class="setting-row"><label>💰 目标价格(元)</label><input type="number" id="cfgGoalPrice" placeholder="多少钱？"></div>
+    <button class="btn-save" onclick="saveSettings()">保存设置</button>
+  </div>
+
+  <div class="section-title">数据</div>
+  <div class="setting-section">
+    <div style="font-size:14px;margin-bottom:12px;">⚠️ 每次重新打开页面，数据可能丢失。建议每天退出前备份一次。</div>
+    <button class="btn-save" onclick="backupData()" style="background:var(--accent);margin-bottom:8px;">📋 备份数据（复制到剪贴板）</button>
+    <div style="margin:12px 0;">
+      <textarea id="restoreInput" placeholder="粘贴备份数据到这里..." style="width:100%;height:60px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px;color:var(--text);font-size:12px;resize:none;outline:none;"></textarea>
+    </div>
+    <button class="btn-save" onclick="restoreData()" style="background:var(--green);">📥 恢复数据</button>
+    <button class="btn-danger" onclick="confirmReset()" style="margin-top:12px;">清空所有数据</button>
+  </div>
+</div>
+
+<div class="bottom-nav">
+  <div class="nav-item active" onclick="switchPage('Home')"><div class="nav-icon">🏠</div>今天</div>
+  <div class="nav-item" onclick="switchPage('History')"><div class="nav-icon">📊</div>记录</div>
+  <div class="nav-item" onclick="switchPage('Redeem')"><div class="nav-icon">🎁</div>兑换</div>
+  <div class="nav-item" onclick="switchPage('Settings')"><div class="nav-icon">⚙️</div>设置</div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="modal-overlay" id="modal">
+  <div class="modal-box">
+    <div class="modal-title" id="modalTitle">确认</div>
+    <div class="modal-desc" id="modalDesc"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">取消</button>
+      <button class="btn-confirm" id="modalConfirm" onclick="closeModal()">确定</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'points_app_data';
+const today = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+};
+
+function defaultCheckins() {
+  return [
+    {key:'sleep', icon:'🌙', name:'12点前睡觉', pts:5},
+    {key:'wake', icon:'☀️', name:'8:30前起床', pts:3},
+    {key:'lunch', icon:'🍱', name:'自制午饭', pts:3},
+    {key:'dinner', icon:'🥘', name:'自制晚饭', pts:3}
+  ];
+}
+
+function defaultData() {
+  return {
+    config: { checkins: defaultCheckins(), task:2, rate:1, goalName:'', goalPrice:0 },
+    days: {}, redeems: [], redeemed: 0
+  };
+}
+
+function loadData() {
+  try {
+    const d = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (d && d.config) {
+      // 兼容旧版本：如果没有checkins字段，从旧的独立字段迁移
+      if (!d.config.checkins) {
+        d.config.checkins = defaultCheckins();
+        saveData(d);
+      }
+      return d;
+    }
+    return defaultData();
+  } catch { return defaultData(); }
+}
+
+function saveData(data) { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+
+function getTodayData() {
+  const data = loadData(); const t = today();
+  if (!data.days[t]) { data.days[t] = {}; saveData(data); }
+  return data;
+}
+
+function showToast(msg) {
+  const el = document.getElementById('toast'); el.textContent = msg;
+  el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 1500);
+}
+
+function showModal(title, desc, onConfirm) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalDesc').textContent = desc;
+  document.getElementById('modal').classList.add('show');
+  document.getElementById('modalConfirm').onclick = () => { closeModal(); onConfirm(); };
+}
+function closeModal() { document.getElementById('modal').classList.remove('show'); }
+
+function switchPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page'+name).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach((n,i) => n.classList.toggle('active', ['Home','History','Redeem','Settings'][i] === name));
+  if (name === 'History') renderHistory();
+  if (name === 'Redeem') renderRedeems();
+  if (name === 'Settings') loadSettings();
+}
+
+function calcTotal(data) {
+  let total = 0; const cfg = data.config;
+  const checkinMap = {};
+  cfg.checkins.forEach(c => checkinMap[c.key] = c.pts);
+  for (const d of Object.values(data.days)) {
+    cfg.checkins.forEach(c => { if (d[c.key]) total += checkinMap[c.key]; });
+    if (d.customs) d.customs.forEach(c => { if (c.done) total += cfg.task; });
+    if (d.completedCustoms) d.completedCustoms.forEach(c => { total += c.pts || cfg.task; });
+  }
+  return total;
+}
+
+function updateCard() {
+  const data = loadData(); const total = calcTotal(data);
+  const rmb = Math.round(total * data.config.rate * 100) / 100;
+  const redeemed = data.redeemed || 0; const remaining = total - redeemed;
+  document.getElementById('totalPoints').textContent = remaining;
+  document.getElementById('totalRMB').textContent = (remaining * data.config.rate).toFixed(0);
+  const goal = data.config.goalPrice || 0; const goalName = data.config.goalName || '';
+  if (goal > 0 && goalName) {
+    const pct = Math.min(100, Math.round(remaining / goal * 100));
+    document.getElementById('goalLabel').textContent = '🎯 ' + goalName;
+    document.getElementById('goalPercent').textContent = pct + '%';
+    document.getElementById('goalFill').style.width = pct + '%';
+  } else {
+    document.getElementById('goalLabel').textContent = '去设置心愿目标 →';
+    document.getElementById('goalPercent').textContent = '';
+    document.getElementById('goalFill').style.width = '0%';
+  }
+  renderCheckinGrid();
+}
+
+// 打卡项渲染
+function renderCheckinGrid() {
+  const data = loadData(); const td = data.days[today()] || {};
+  const grid = document.getElementById('checkinGrid');
+  grid.innerHTML = data.config.checkins.map(c => {
+    const checked = td[c.key] ? 'checked' : '';
+    return `<div class="checkin-item ${checked}" onclick="toggleCheckin('${c.key}')">
+      <div class="icon">${c.icon}</div>
+      <div class="name">${c.name}</div>
+      <div class="pts">+${c.pts}分</div>
+      <div class="undo-hint">再点撤销</div>
+    </div>`;
+  }).join('');
+}
+
+// 打卡切换
+function toggleCheckin(key) {
+  const data = getTodayData(); const td = data.days[today()];
+  const item = data.config.checkins.find(c => c.key === key);
+  if (!item) return;
+  if (td[key]) {
+    showModal('撤销打卡', `确定撤销「${item.icon} ${item.name}」的打卡记录？将扣除 ${item.pts} 积分`, () => {
+      td[key] = false; saveData(data); updateCard();
+      showToast(`已撤销 ${item.icon} ${item.name} -${item.pts}分`);
+    }); return;
+  }
+  td[key] = true; saveData(data); updateCard();
+  showToast(`${item.icon} ${item.name} +${item.pts}分 🎉`);
+}
+
+// 自定义任务
+function addCustomTask() {
+  const input = document.getElementById('customTaskInput'); const name = input.value.trim();
+  if (!name) return;
+  const data = getTodayData(); if (!data.days[today()].customs) data.days[today()].customs = [];
+  data.days[today()].customs.push({ name, done: false });
+  saveData(data); input.value = ''; renderCustomTasks(); updateCard();
+}
+
+function completeCustomTask(idx) {
+  const data = loadData(); const td = data.days[today()];
+  if (td && td.customs && td.customs[idx]) {
+    const name = td.customs[idx].name; const pts = data.config.task;
+    showModal('完成任务 🎉', `完成「${name}」获得 ${pts} 积分，任务将被移除`, () => {
+      td.customs.splice(idx, 1);
+      if (!td.completedCustoms) td.completedCustoms = [];
+      td.completedCustoms.push({ name, pts }); saveData(data);
+      showToast(`✅ ${name} +${pts}分 🎉`); renderCustomTasks(); updateCard();
+    });
+  }
+}
+
+function deleteCustomTask(idx) {
+  const data = loadData(); const td = data.days[today()];
+  if (td && td.customs && td.customs[idx]) {
+    const name = td.customs[idx].name;
+    showModal('删除任务', `删除「${name}」？不会获得积分`, () => {
+      td.customs.splice(idx, 1); saveData(data); renderCustomTasks();
+    });
+  }
+}
+
+function renderCustomTasks() {
+  const data = loadData(); const td = data.days[today()];
+  const list = document.getElementById('customTaskList');
+  if (!td || !td.customs || !td.customs.length) {
+    list.innerHTML = '<div class="empty-state" style="padding:16px;font-size:13px;">添加任务后点圆圈完成，完成即得分 ✓</div>'; return;
+  }
+  list.innerHTML = td.customs.map((c, i) => `<div class="task-item"><div class="left"><div class="check-circle" onclick="completeCustomTask(${i})"></div><span class="task-name">${c.name}</span></div><div class="task-right"><span class="task-pts">+${data.config.task}分</span><button class="btn-del-task" onclick="deleteCustomTask(${i})">✕</button></div></div>`).join('');
+}
+
+// 历史记录
+function renderHistory() {
+  const data = loadData(); const cfg = data.config;
+  const days = Object.keys(data.days).sort().reverse();
+  let totalPts = 0, dayCount = days.length;
+  const checkinStats = {};
+  cfg.checkins.forEach(c => checkinStats[c.key] = 0);
+
+  days.forEach(d => {
+    const day = data.days[d];
+    cfg.checkins.forEach(c => { if (day[c.key]) { totalPts += c.pts; checkinStats[c.key]++; } });
+    if (day.customs) day.customs.forEach(c => { if (c.done) totalPts += cfg.task; });
+    if (day.completedCustoms) day.completedCustoms.forEach(c => { totalPts += c.pts || cfg.task; });
+  });
+
+  document.getElementById('statTotal').textContent = totalPts;
+  document.getElementById('statDays').textContent = dayCount;
+
+  // 早睡/早起统计（兼容旧数据）
+  const sleepItem = cfg.checkins.find(c => c.key === 'sleep');
+  const wakeItem = cfg.checkins.find(c => c.key === 'wake');
+  document.getElementById('statSleepRate').textContent = (sleepItem && dayCount) ? Math.round(checkinStats.sleep/dayCount*100)+'%' : '-';
+  document.getElementById('statWakeRate').textContent = (wakeItem && dayCount) ? Math.round(checkinStats.wake/dayCount*100)+'%' : '-';
+
+  const list = document.getElementById('historyList');
+  if (!days.length) { list.innerHTML = '<div class="empty-state">还没有记录哦~</div>'; return; }
+  list.innerHTML = days.map(d => {
+    const day = data.days[d]; let pts = 0; const items = [];
+    cfg.checkins.forEach(c => { if (day[c.key]) { pts += c.pts; items.push(`${c.icon} ${c.name} <span class="item-pts">+${c.pts}</span>`); } });
+    if (day.customs) day.customs.forEach(c => { if (c.done) { pts += cfg.task; items.push(`📋 ${c.name} <span class="item-pts">+${cfg.task}</span>`); } });
+    if (day.completedCustoms) day.completedCustoms.forEach(c => { const p = c.pts || cfg.task; pts += p; items.push(`📋 ${c.name} <span class="item-pts">+${p}</span>`); });
+    const weekDay = ['日','一','二','三','四','五','六'][new Date(d).getDay()];
+    return `<div class="history-day"><div class="day-header"><span class="day-date">${d} 周${weekDay}</span><span class="day-points">+${pts}分</span></div><div class="day-items">${items.length?items.join('<br>'):'暂无打卡'}</div></div>`;
+  }).join('');
+}
+
+// 兑换
+function renderRedeems() {
+  const data = loadData(); const total = calcTotal(data); const remaining = total - (data.redeemed || 0);
+  const list = document.getElementById('redeemList');
+  if (!data.redeems || !data.redeems.length) { list.innerHTML = '<div class="empty-state">添加一个心愿吧~</div>'; return; }
+  list.innerHTML = data.redeems.map((r, i) => `<div class="redeem-card"><div class="redeem-info"><div class="redeem-name">🎁 ${r.name}</div><div class="redeem-cost">${r.cost}积分 = ¥${(r.cost*data.config.rate).toFixed(0)}</div></div><button class="btn-redeem" ${remaining<r.cost?'disabled':''} onclick="doRedeem(${i})">兑换</button></div>`).join('');
+}
+
+function addRedeem() {
+  const name = document.getElementById('redeemName').value.trim();
+  const cost = parseInt(document.getElementById('redeemCost').value);
+  if (!name || !cost || cost <= 0) { showToast('请填写完整'); return; }
+  const data = loadData(); if (!data.redeems) data.redeems = [];
+  data.redeems.push({ name, cost }); saveData(data);
+  document.getElementById('redeemName').value = ''; document.getElementById('redeemCost').value = '';
+  renderRedeems(); showToast('心愿已添加 🎉');
+}
+
+function doRedeem(idx) {
+  const data = loadData(); const r = data.redeems[idx];
+  const total = calcTotal(data); const remaining = total - (data.redeemed || 0);
+  if (remaining < r.cost) { showToast('积分不足哦~'); return; }
+  showModal('确认兑换', `用 ${r.cost} 积分兑换「${r.name}」？`, () => {
+    data.redeemed = (data.redeemed || 0) + r.cost; data.redeems.splice(idx, 1);
+    saveData(data); renderRedeems(); updateCard(); showToast('兑换成功！去买喜欢的吧 🛒');
+  });
+}
+
+// 设置 - 打卡项目管理
+function renderCheckinManage() {
+  const data = loadData();
+  const list = document.getElementById('checkinManageList');
+  if (!data.config.checkins.length) {
+    list.innerHTML = '<div style="color:var(--text-dim);font-size:13px;padding:8px 0;">暂无打卡项，在下方添加</div>';
+    return;
+  }
+  list.innerHTML = data.config.checkins.map((c, i) =>
+    `<div class="checkin-manage-item">
+      <div class="cm-left">
+        <span class="cm-icon">${c.icon}</span>
+        <span>${c.name}</span>
+        <span class="cm-pts">+${c.pts}分</span>
+      </div>
+      <button class="btn-small-danger" onclick="deleteCheckinItem(${i})">删除</button>
+    </div>`
+  ).join('');
+}
+
+function addCheckinItem() {
+  const icon = document.getElementById('newCheckinIcon').value.trim() || '✅';
+  const name = document.getElementById('newCheckinName').value.trim();
+  const pts = parseInt(document.getElementById('newCheckinPts').value) || 3;
+  if (!name) { showToast('请输入任务名称'); return; }
+  const data = loadData();
+  const key = 'c_' + Date.now();
+  data.config.checkins.push({ key, icon, name, pts });
+  saveData(data);
+  document.getElementById('newCheckinIcon').value = '';
+  document.getElementById('newCheckinName').value = '';
+  document.getElementById('newCheckinPts').value = '3';
+  renderCheckinManage(); updateCard();
+  showToast(`已添加 ${icon} ${name} 🎉`);
+}
+
+function deleteCheckinItem(idx) {
+  const data = loadData();
+  const item = data.config.checkins[idx];
+  showModal('删除打卡项', `确定删除「${item.icon} ${item.name}」？历史数据中的该打卡记录也会被移除。`, () => {
+    // 从所有天数据中移除该key
+    Object.keys(data.days).forEach(d => { delete data.days[d][item.key]; });
+    data.config.checkins.splice(idx, 1);
+    saveData(data); renderCheckinManage(); updateCard();
+    showToast('已删除');
+  });
+}
+
+function loadSettings() {
+  const data = loadData();
+  renderCheckinManage();
+  document.getElementById('cfgTask').value = data.config.task;
+  document.getElementById('cfgRate').value = data.config.rate;
+  document.getElementById('cfgGoalName').value = data.config.goalName || '';
+  document.getElementById('cfgGoalPrice').value = data.config.goalPrice || '';
+}
+
+function saveSettings() {
+  const data = loadData();
+  data.config.task = parseInt(document.getElementById('cfgTask').value) || 2;
+  data.config.rate = parseFloat(document.getElementById('cfgRate').value) || 1;
+  data.config.goalName = document.getElementById('cfgGoalName').value.trim();
+  data.config.goalPrice = parseInt(document.getElementById('cfgGoalPrice').value) || 0;
+  saveData(data); updateCard(); showToast('设置已保存 ✨');
+}
+
+function confirmReset() {
+  showModal('⚠️ 清空数据', '确定要清空所有积分记录吗？此操作不可恢复。', () => {
+    localStorage.removeItem(STORAGE_KEY); updateCard(); renderCustomTasks(); showToast('数据已清空');
+  });
+}
+
+function backupData() {
+  const data = loadData(); const json = JSON.stringify(data);
+  const encoded = btoa(unescape(encodeURIComponent(json)));
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(encoded).then(() => showToast('已复制到剪贴板 ✅')).catch(() => fallbackCopy(encoded));
+  } else { fallbackCopy(encoded); }
+}
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.left = '-9999px';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); showToast('已复制到剪贴板 ✅'); }
+  catch(e) { showToast('复制失败，请手动复制'); document.getElementById('restoreInput').value = text; }
+  document.body.removeChild(ta);
+}
+
+function restoreData() {
+  const input = document.getElementById('restoreInput').value.trim();
+  if (!input) { showToast('请先粘贴备份数据'); return; }
+  try {
+    const json = decodeURIComponent(escape(atob(input))); const data = JSON.parse(json);
+    if (!data.config || !data.days) throw new Error('invalid');
+    saveData(data); updateCard(); renderCustomTasks(); showToast('数据恢复成功 ✅');
+  } catch(e) { showToast('备份数据格式错误'); }
+}
+
+// 初始化
+updateCard(); renderCustomTasks();
+document.getElementById('customTaskInput').addEventListener('keydown', e => { if (e.key === 'Enter') addCustomTask(); });
+</script>
+</body>
+</html>
