@@ -331,7 +331,7 @@ function defaultCheckins() {
 
 function defaultData() {
   return {
-    config: { checkins: defaultCheckins(), task:2, rate:1, goalName:'', goalPrice:0 },
+    config: { checkins: defaultCheckins(), archivedCheckins: [], task:2, rate:1, goalName:'', goalPrice:0 },
     days: {}, redeems: [], redeemed: 0
   };
 }
@@ -344,6 +344,10 @@ function loadData() {
       if (!d.config.checkins) {
         d.config.checkins = defaultCheckins();
         saveData(d);
+      }
+      // 兼容旧版本：如果没有archivedCheckins字段，初始化为空数组
+      if (!d.config.archivedCheckins) {
+        d.config.archivedCheckins = [];
       }
       return d;
     }
@@ -381,12 +385,19 @@ function switchPage(name) {
   if (name === 'Settings') loadSettings();
 }
 
+function getAllCheckins(data) {
+  const cfg = data.config;
+  const archived = cfg.archivedCheckins || [];
+  return [...cfg.checkins, ...archived];
+}
+
 function calcTotal(data) {
   let total = 0; const cfg = data.config;
+  const allCheckins = getAllCheckins(data);
   const checkinMap = {};
-  cfg.checkins.forEach(c => checkinMap[c.key] = c.pts);
+  allCheckins.forEach(c => checkinMap[c.key] = c.pts);
   for (const d of Object.values(data.days)) {
-    cfg.checkins.forEach(c => { if (d[c.key]) total += checkinMap[c.key]; });
+    allCheckins.forEach(c => { if (d[c.key]) total += checkinMap[c.key]; });
     if (d.customs) d.customs.forEach(c => { if (c.done) total += cfg.task; });
     if (d.completedCustoms) d.completedCustoms.forEach(c => { total += c.pts || cfg.task; });
   }
@@ -487,14 +498,15 @@ function renderCustomTasks() {
 // 历史记录
 function renderHistory() {
   const data = loadData(); const cfg = data.config;
+  const allCheckins = getAllCheckins(data);
   const days = Object.keys(data.days).sort().reverse();
   let totalPts = 0, dayCount = days.length;
   const checkinStats = {};
-  cfg.checkins.forEach(c => checkinStats[c.key] = 0);
+  allCheckins.forEach(c => checkinStats[c.key] = 0);
 
   days.forEach(d => {
     const day = data.days[d];
-    cfg.checkins.forEach(c => { if (day[c.key]) { totalPts += c.pts; checkinStats[c.key]++; } });
+    allCheckins.forEach(c => { if (day[c.key]) { totalPts += c.pts; checkinStats[c.key]++; } });
     if (day.customs) day.customs.forEach(c => { if (c.done) totalPts += cfg.task; });
     if (day.completedCustoms) day.completedCustoms.forEach(c => { totalPts += c.pts || cfg.task; });
   });
@@ -503,8 +515,8 @@ function renderHistory() {
   document.getElementById('statDays').textContent = dayCount;
 
   // 早睡/早起统计（兼容旧数据）
-  const sleepItem = cfg.checkins.find(c => c.key === 'sleep');
-  const wakeItem = cfg.checkins.find(c => c.key === 'wake');
+  const sleepItem = allCheckins.find(c => c.key === 'sleep');
+  const wakeItem = allCheckins.find(c => c.key === 'wake');
   document.getElementById('statSleepRate').textContent = (sleepItem && dayCount) ? Math.round(checkinStats.sleep/dayCount*100)+'%' : '-';
   document.getElementById('statWakeRate').textContent = (wakeItem && dayCount) ? Math.round(checkinStats.wake/dayCount*100)+'%' : '-';
 
@@ -512,7 +524,7 @@ function renderHistory() {
   if (!days.length) { list.innerHTML = '<div class="empty-state">还没有记录哦~</div>'; return; }
   list.innerHTML = days.map(d => {
     const day = data.days[d]; let pts = 0; const items = [];
-    cfg.checkins.forEach(c => { if (day[c.key]) { pts += c.pts; items.push(`${c.icon} ${c.name} <span class="item-pts">+${c.pts}</span>`); } });
+    allCheckins.forEach(c => { if (day[c.key]) { pts += c.pts; items.push(`${c.icon} ${c.name} <span class="item-pts">+${c.pts}</span>`); } });
     if (day.customs) day.customs.forEach(c => { if (c.done) { pts += cfg.task; items.push(`📋 ${c.name} <span class="item-pts">+${cfg.task}</span>`); } });
     if (day.completedCustoms) day.completedCustoms.forEach(c => { const p = c.pts || cfg.task; pts += p; items.push(`📋 ${c.name} <span class="item-pts">+${p}</span>`); });
     const weekDay = ['日','一','二','三','四','五','六'][new Date(d).getDay()];
@@ -587,12 +599,13 @@ function addCheckinItem() {
 function deleteCheckinItem(idx) {
   const data = loadData();
   const item = data.config.checkins[idx];
-  showModal('删除打卡项', `确定删除「${item.icon} ${item.name}」？历史数据中的该打卡记录也会被移除。`, () => {
-    // 从所有天数据中移除该key
-    Object.keys(data.days).forEach(d => { delete data.days[d][item.key]; });
+  showModal('删除打卡项', `确定删除「${item.icon} ${item.name}」？已获得的历史积分会保留，只是以后不再显示这个打卡项。`, () => {
+    // 移到归档列表，保留历史积分
+    if (!data.config.archivedCheckins) data.config.archivedCheckins = [];
+    data.config.archivedCheckins.push(item);
     data.config.checkins.splice(idx, 1);
     saveData(data); renderCheckinManage(); updateCard();
-    showToast('已删除');
+    showToast('已删除，历史积分保留');
   });
 }
 
